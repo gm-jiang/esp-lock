@@ -25,8 +25,13 @@
  */
 
 static const char *TAG = "example";
-
+#define SENSOR_GPIO_EVT 1
+#define SENSOR_PIN 42
 #define BLINK_LED_PIN 21
+#define ESP_INTR_FLAG_DEFAULT 0
+#define OPEN_TIMEOUT 4000
+
+static QueueHandle_t gpio_evt_queue = NULL;
 
 static void lock_control(uint8_t led_state)
 {
@@ -52,6 +57,56 @@ static void configure_lock(void)
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     //configure GPIO with the given settings
     gpio_config(&io_conf);
+}
+
+static void IRAM_ATTR gpio_isr_handler(void *arg)
+{
+    uint32_t gpio_evt = SENSOR_GPIO_EVT;
+    xQueueSendFromISR(gpio_evt_queue, &gpio_evt, NULL);
+}
+
+static void sensor_gpio_task(void *arg)
+{
+    uint32_t gpio_evt;
+    for (;;) {
+        if (xQueueReceive(gpio_evt_queue, &gpio_evt, portMAX_DELAY)) {
+            printf("Sensor gpio interrupt incoming, val: %d\n", gpio_get_level(SENSOR_PIN));
+            lock_control(1);
+            //while (gpio_get_level(SENSOR_PIN)) {
+                vTaskDelay(2000 / portTICK_PERIOD_MS);
+            //}
+            lock_control(0);
+        }
+    }
+}
+
+static void configure_sensor(void)
+{
+    ESP_LOGI(TAG, "Example configured sensor pin!");
+
+    //zero-initialize the config structure.
+    gpio_config_t io_conf = {};
+    //disable interrupt
+    io_conf.intr_type = GPIO_INTR_POSEDGE;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //bit mask of the pins that you want to set,e.g.20
+    io_conf.pin_bit_mask = 1ULL << SENSOR_PIN;
+    //enable pull-down mode
+    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+    //disable pull-up mode
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+
+    //install gpio isr service
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    //hook isr handler for pin
+    gpio_isr_handler_add(SENSOR_PIN, gpio_isr_handler, NULL);
+    //create q queue to handle gpio event from gpio isr
+    gpio_evt_queue = xQueueCreate(3, sizeof(uint32_t));
+    //create gpio task
+    xTaskCreate(sensor_gpio_task, "sensor_gpio", 2048, NULL, 10, NULL);
 }
 
 #if CONFIG_EXAMPLE_BASIC_AUTH
@@ -191,7 +246,7 @@ static esp_err_t hello_get_handler(httpd_req_t *req)
             lock_control(1);
             extern void play_open_door(void);
             play_open_door();
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            vTaskDelay(OPEN_TIMEOUT / portTICK_PERIOD_MS);
             lock_control(0);
         }
         free(buf);
@@ -431,6 +486,7 @@ void app_main(void)
     static httpd_handle_t server = NULL;
 
     configure_lock();
+    configure_sensor();
     lock_control(0);
 
     ESP_ERROR_CHECK(nvs_flash_init());
