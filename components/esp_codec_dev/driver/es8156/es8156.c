@@ -33,7 +33,7 @@
 #include "codec_dev_err.h"
 #include "codec_dev_utils.h"
 
-#define BIT(b) (1 << b)
+//#define BIT(b) (1 << b)
 
 #define TAG    "ES8156"
 

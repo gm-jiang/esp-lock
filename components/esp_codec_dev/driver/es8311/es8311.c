@@ -35,7 +35,7 @@
 /* ES8311 address
  * 0x32:CE=1;0x30:CE=0
  */
-#define BIT(n)       ((uint64_t) 1 << n)
+//#define BIT(n)       ((uint64_t) 1 << n)
 #define MCLK_DIV_FRE 256
 #define TAG          "ES8311"
 
