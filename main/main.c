@@ -29,7 +29,8 @@ static const char *TAG = "example";
 #define SENSOR_PIN 42
 #define BLINK_LED_PIN 21
 #define ESP_INTR_FLAG_DEFAULT 0
-#define OPEN_TIMEOUT 4000
+#define SENSOR_TIMEOUT 1500
+#define OPEN_TIMEOUT 5000
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
@@ -73,7 +74,7 @@ static void sensor_gpio_task(void *arg)
             printf("Sensor gpio interrupt incoming, val: %d\n", gpio_get_level(SENSOR_PIN));
             lock_control(1);
             //while (gpio_get_level(SENSOR_PIN)) {
-                vTaskDelay(2000 / portTICK_PERIOD_MS);
+                vTaskDelay(SENSOR_TIMEOUT / portTICK_PERIOD_MS);
             //}
             lock_control(0);
         }
